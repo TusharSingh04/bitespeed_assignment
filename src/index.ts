@@ -2,9 +2,23 @@ import 'dotenv/config';
 import express, { Request, Response, NextFunction } from 'express';
 import identifyRoutes from './routes/identify';
 import prisma from './db';
+import { execSync } from 'child_process';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Initialize database on startup
+async function initializeDatabase() {
+  try {
+    // Push schema to database (creates tables if they don't exist)
+    console.log('🔄 Initializing database...');
+    execSync('npx prisma db push --skip-generate', { stdio: 'inherit' });
+    console.log('✅ Database initialized successfully');
+  } catch (error) {
+    console.error('⚠️ Database initialization warning:', error);
+    // Continue anyway - the database might already exist
+  }
+}
 
 // Middleware
 app.use(express.json());
@@ -52,10 +66,16 @@ async function gracefulShutdown() {
 process.on('SIGTERM', gracefulShutdown);
 process.on('SIGINT', gracefulShutdown);
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`🚀 Server is running on http://localhost:${PORT}`);
-  console.log(`📍 POST /identify - Identity Reconciliation Endpoint`);
-});
+// Start server with database initialization
+async function startServer() {
+  await initializeDatabase();
+  
+  app.listen(PORT, () => {
+    console.log(`🚀 Server is running on http://localhost:${PORT}`);
+    console.log(`📍 POST /identify - Identity Reconciliation Endpoint`);
+  });
+}
+
+startServer().catch(console.error);
 
 export default app;
